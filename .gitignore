@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build outputs (except dist for deployment)
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Explicitly ignore these per user request
+agentic-evaluation-example/
+Masterplan-Tim.md
+
+# Source files that shouldn't be in deployment
+src/
+build.js
+tsconfig.json
+package.json
+package-lock.json
+SPEC.md

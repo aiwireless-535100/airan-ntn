@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>airan-ntn — O-RAN NTN Simulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1>airan-ntn</h1>
+        <span class="subtitle">O-RAN NTN Simulator</span>
+      </div>
+      <div class="header-center">
+        <span id="phase" class="hdr-phase">idle</span>
+        <span class="hdr-sep">·</span>
+        <span>Round <span id="round-num">0</span> / <span id="total-rounds">50</span></span>
+      </div>
+      <div class="header-right">
+        <label>Speed <span id="speed-val">3</span>×</label>
+        <input type="range" id="speed" min="0.5" max="10" step="0.5" value="3">
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="main-grid">
+      <!-- Left Panel: Controls -->
+      <aside class="controls-panel">
+        <div class="control-section">
+          <h3>Preset</h3>
+          <select id="preset">
+            <option value="demo">Demo (6×3, 10 UEs, 20 rounds)</option>
+            <option value="standard" selected>Standard (12×6, 20 UEs, 50 rounds)</option>
+            <option value="large">Large (22×6, 50 UEs, 100 rounds)</option>
+            <option value="geo">GEO (1×3, 15 UEs, 30 rounds)</option>
+            <option value="fl_focused">FL-Focused (8×4, 40 UEs, 100 rounds)</option>
+          </select>
+        </div>
+
+        <div class="control-section">
+          <h3>Constellation</h3>
+          <div class="ctrl-row">
+            <label>Orbitals/Plane <span id="cfg-orbital-val">12</span></label>
+            <input type="range" id="cfg-orbitals" min="2" max="30" value="12">
+          </div>
+          <div class="ctrl-row">
+            <label>Planes <span id="cfg-planes-val">6</span></label>
+            <input type="range" id="cfg-planes" min="1" max="12" value="6">
+          </div>
+          <div class="ctrl-row">
+            <label>Inclination <span id="cfg-inclination-val">53°</span></label>
+            <input type="range" id="cfg-inclination" min="0" max="90" value="53">
+          </div>
+          <div class="ctrl-row">
+            <label>Altitude <span id="cfg-altitude-val">550km</span></label>
+            <input type="range" id="cfg-altitude" min="300" max="36000" value="550">
+          </div>
+          <div class="ctrl-row">
+            <label>Orbit Type</label>
+            <select id="cfg-orbittype">
+              <option value="LEO">LEO</option>
+              <option value="MEO">MEO</option>
+              <option value="GEO">GEO</option>
+            </select>
+          </div>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-isl" checked> Enable ISL</label>
+          </div>
+          <div class="ctrl-row">
+            <label>ISL Range <span id="cfg-islrange-val">5000</span>km</label>
+            <input type="range" id="cfg-islrange" min="1000" max="10000" value="5000">
+          </div>
+          <div class="ctrl-row">
+            <label>ISL Type</label>
+            <select id="cfg-isltype">
+              <option value="laser">Laser</option>
+              <option value="rf">RF</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Channel</h3>
+          <div class="ctrl-row">
+            <label>Freq <span id="cfg-freq-val">2.6</span>GHz</label>
+            <input type="range" id="cfg-freq" min="0.5" max="30" step="0.1" value="2.6">
+          </div>
+          <div class="ctrl-row">
+            <label>BW <span id="cfg-bw-val">20</span>MHz</label>
+            <input type="range" id="cfg-bw" min="5" max="400" value="20">
+          </div>
+          <div class="ctrl-row">
+            <label>Model</label>
+            <select id="cfg-channel">
+              <option value="NTN-LOS">NTN-LOS</option>
+              <option value="NTN-NLOS">NTN-NLOS</option>
+              <option value="Rayleigh">Rayleigh</option>
+              <option value="Rician">Rician</option>
+              <option value="AWGN">AWGN</option>
+            </select>
+          </div>
+          <div class="ctrl-row">
+            <label>PL Exp <span id="cfg-ple-val">0</span> (0=3GPP)</label>
+            <input type="range" id="cfg-ple" min="0" max="5" step="0.1" value="0">
+          </div>
+          <div class="ctrl-row">
+            <label>Shadowing <span id="cfg-shadow-val">4</span>dB</label>
+            <input type="range" id="cfg-shadow" min="0" max="12" value="4">
+          </div>
+          <div class="ctrl-row">
+            <label>Rician K <span id="cfg-rician-val">10</span>dB</label>
+            <input type="range" id="cfg-rician" min="0" max="20" value="10">
+          </div>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-doppler" checked> Doppler</label>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Mobility</h3>
+          <div class="ctrl-row">
+            <label>UEs <span id="cfg-ues-val">20</span></label>
+            <input type="range" id="cfg-ues" min="5" max="100" value="20">
+          </div>
+          <div class="ctrl-row">
+            <label>UE Speed <span id="cfg-uespeed-val">1.4</span>m/s</label>
+            <input type="range" id="cfg-uespeed" min="0" max="30" step="0.1" value="1.4">
+          </div>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-walk" checked> Lévy Walk</label>
+          </div>
+          <div class="ctrl-row">
+            <label>Walk Speed <span id="cfg-walkspeed-val">1.4</span>m/s</label>
+            <input type="range" id="cfg-walkspeed" min="0" max="10" step="0.1" value="1.4">
+          </div>
+          <div class="ctrl-row">
+            <label>Round Dur <span id="cfg-rounddur-val">5.0</span>s</label>
+            <input type="range" id="cfg-rounddur" min="0.1" max="30" step="0.1" value="5.0">
+          </div>
+          <div class="ctrl-row">
+            <label>Lévy α <span id="cfg-levyalpha-val">1.80</span></label>
+            <input type="range" id="cfg-levyalpha" min="1.1" max="2.9" step="0.05" value="1.8">
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Federated Learning</h3>
+          <div class="ctrl-row">
+            <label>Algorithm</label>
+            <select id="cfg-fl">
+              <option value="FedAVG">FedAVG</option>
+              <option value="FedSGD">FedSGD</option>
+              <option value="FedProx">FedProx</option>
+            </select>
+          </div>
+          <div class="ctrl-row">
+            <label>Scheduler</label>
+            <select id="cfg-sched">
+              <option value="Random">Random</option>
+              <option value="RoundRobin">RoundRobin</option>
+              <option value="MaxMin">MaxMin</option>
+              <option value="MaxMax">MaxMax</option>
+              <option value="DCC">DCC</option>
+              <option value="Grover">Grover</option>
+              <option value="Spatial">Spatial</option>
+              <option value="Beamforming">Beamforming</option>
+              <option value="VirtualMIMO">VirtualMIMO</option>
+              <option value="NtnElevation" selected>NTN-Elevation</option>
+              <option value="NtnDoppler">NTN-Doppler</option>
+              <option value="NtnFeederAware">NTN-FeederAware</option>
+            </select>
+          </div>
+          <div class="ctrl-row">
+            <label>Epochs <span id="cfg-epochs-val">5</span></label>
+            <input type="range" id="cfg-epochs" min="1" max="20" value="5">
+          </div>
+          <div class="ctrl-row">
+            <label>LR <span id="cfg-lr-val">0.050</span></label>
+            <input type="range" id="cfg-lr" min="0.001" max="0.2" step="0.001" value="0.05">
+          </div>
+          <div class="ctrl-row">
+            <label>FedProx μ <span id="cfg-mu-val">0.010</span></label>
+            <input type="range" id="cfg-mu" min="0" max="0.1" step="0.001" value="0.01">
+          </div>
+          <div class="ctrl-row">
+            <label>Sel/Round <span id="cfg-ksel-val">8</span></label>
+            <input type="range" id="cfg-ksel" min="1" max="50" value="8">
+          </div>
+          <div class="ctrl-row">
+            <label>Rounds <span id="cfg-rounds-val">50</span></label>
+            <input type="range" id="cfg-rounds" min="10" max="200" value="50">
+          </div>
+          <div class="ctrl-row">
+            <label>Features <span id="cfg-features-val">4</span></label>
+            <input type="range" id="cfg-features" min="2" max="20" value="4">
+          </div>
+          <div class="ctrl-row">
+            <label>Classes <span id="cfg-classes-val">3</span></label>
+            <input type="range" id="cfg-classes" min="2" max="10" value="3">
+          </div>
+          <div class="ctrl-row">
+            <label>Samples/UE <span id="cfg-samples-val">80</span></label>
+            <input type="range" id="cfg-samples" min="10" max="500" value="80">
+          </div>
+          <div class="ctrl-row">
+            <label>Non-IID α <span id="cfg-alpha-val">0.50</span></label>
+            <input type="range" id="cfg-alpha" min="0.05" max="2" step="0.05" value="0.5">
+          </div>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-coop"> BS Coop</label>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>NTN-Aware FL</h3>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-ntn-sched" checked> NTN Scheduling</label>
+          </div>
+          <div class="ctrl-row">
+            <label>Min Elev <span id="cfg-minelev-val">10</span>°</label>
+            <input type="range" id="cfg-minelev" min="0" max="60" value="10">
+          </div>
+          <div class="ctrl-row">
+            <label>Max Doppler <span id="cfg-maxdoppler-val">5000</span>Hz</label>
+            <input type="range" id="cfg-maxdoppler" min="100" max="20000" value="5000">
+          </div>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-feederreq" checked> Require Feeder</label>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Space RIC</h3>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-spaceric" checked> Enabled</label>
+          </div>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-auto" checked> Autonomous Mode</label>
+          </div>
+          <div class="ctrl-row">
+            <label>Feeder Thr <span id="cfg-feederthr-val">30</span>s</label>
+            <input type="range" id="cfg-feederthr" min="5" max="120" value="30">
+          </div>
+          <div class="ctrl-row">
+            <label>Sync Int <span id="cfg-syncint-val">10</span></label>
+            <input type="range" id="cfg-syncint" min="1" max="50" value="10">
+          </div>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-islcoord" checked> ISL Coord</label>
+          </div>
+          <div class="ctrl-row">
+            <label>Grad Comp <span id="cfg-gradcomp-val">0.10</span></label>
+            <input type="range" id="cfg-gradcomp" min="0.01" max="0.5" step="0.01" value="0.1">
+          </div>
+          <div class="ctrl-row">
+            <label><input type="checkbox" id="cfg-eclipsefl" checked> Eclipse FL</label>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>xApps</h3>
+          <select id="cfg-xapps" multiple size="9">
+            <option value="ho-predict" selected>HO Predict</option>
+            <option value="beam-hop" selected>Beam Hop</option>
+            <option value="slice-manager" selected>Slice Manager</option>
+            <option value="doppler-comp" selected>Doppler Comp</option>
+            <option value="tn-ntn-steering" selected>TN-NTN Steering</option>
+            <option value="energy-harvest" selected>Energy Harvest</option>
+            <option value="interference-mgmt" selected>Interference Mgmt</option>
+            <option value="multi-conn" selected>Multi-Conn</option>
+            <option value="predictive-alloc" selected>Predictive Alloc</option>
+          </select>
+        </div>
+
+        <div class="control-section">
+          <h3>Simulation</h3>
+          <div class="ctrl-row">
+            <label>Speed <span id="cfg-speedms-val">300</span>ms</label>
+            <input type="range" id="cfg-speedms" min="50" max="2000" value="300">
+          </div>
+          <div class="ctrl-row">
+            <label>Seed <span id="cfg-seed-val">42</span></label>
+            <input type="range" id="cfg-seed" min="0" max="10000" value="42">
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Topology Canvas -->
+      <div class="center-panel">
+        <canvas id="topo" width="800" height="600"></canvas>
+      </div>
+
+      <!-- Right Panel: KPIs-->
+      <aside class="kpi-panel">
+        <div class="kpi-section">
+          <h3>Global Metrics</h3>
+          <div class="kpi-row">
+            <span class="kpi-label">Loss</span>
+            <span id="stat-loss" class="kpi-value">—</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">Accuracy</span>
+            <span id="stat-acc" class="kpi-value">—</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">Avg SNR</span>
+            <span id="stat-snr" class="kpi-value">—</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">Selected</span>
+            <span id="stat-sel" class="kpi-value">—</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">Comm Cost</span>
+            <span id="stat-comm" class="kpi-value">—</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">Avg Elev</span>
+            <span id="stat-elev" class="kpi-value">—</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">Avg Doppler</span>
+            <span id="stat-doppler" class="kpi-value">—</span>
+          </div>
+          <div class="kpi-row">
+            <span class="kpi-label">Feeder Up</span>
+            <span id="stat-feeder" class="kpi-value">—</span>
+          </div>
+        </div>
+
+        <div class="kpi-section">
+          <h3>Charts</h3>
+          <canvas id="chart" width="300" height="400"></canvas>
+        </div>
+
+        <div class="kpi-section">
+          <h3>UE SNR</h3>
+          <canvas id="snr-bars" width="300" height="150"></canvas>
+        </div>
+
+        <div class="kpi-section">
+          <h3>Actions</h3>
+          <button id="run-btn" class="btn primary">▶ START</button>
+          <button id="rst-btn" class="btn">↺ RESET</button>
+          <button id="csv-btn" class="btn">↓ EXPORT CSV</button>
+        </div>
+
+        <div class="kpi-section">
+          <h3>Legend</h3>
+          <div class="legend">
+            <div class="legend-item"><span class="legend-color" style="background:#00ffff"></span> ISL Links</div>
+            <div class="legend-item"><span class="legend-color" style="background:#ffaa00"></span> Feeder Links</div>
+            <div class="legend-item"><span class="legend-color" style="background:#008855"></span> SNR Good (≥15dB)</div>
+            <div class="legend-item"><span class="legend-color" style="background:#c89000"></span> SNR Med (5-15dB)</div>
+            <div class="legend-item"><span class="legend-color" style="background:#cc2233"></span> SNR Poor (<5dB)</div>
+            <div class="legend-item"><span class="legend-color" style="background:#ffff00"></span> Selected UE</div>
+            <div class="legend-item"><span class="legend-color" style="background:#0099cc"></span> Satellite</div>
+            <div class="legend-item"><span class="legend-color" style="background:#666"></span> Ground Station</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
