@@ -2821,6 +2821,7 @@ function initSim() {
   elevEl.textContent = "\u2014";
   dopplerEl.textContent = "\u2014";
   feederEl.textContent = "\u2014";
+  setupOrbitTypeListener();
   resizeCanvases();
   renderTopology(topoCanvas.getContext("2d"), sim.getState(), viewState);
   chartCanvas.getContext("2d").clearRect(0, 0, chartCanvas.width, chartCanvas.height);
@@ -2994,17 +2995,21 @@ function updateAltitudeForOrbitType(orbitType) {
     altitudeInput.dispatchEvent(new Event("input"));
   }
 }
-var orbitTypeSel = document.getElementById("cfg-orbittype");
-orbitTypeSel.addEventListener("change", (e) => {
-  updateAltitudeForOrbitType(e.target.value);
-});
-updateAltitudeForOrbitType(orbitTypeSel.value);
-var originalApplyPreset = applyPreset;
+function setupOrbitTypeListener() {
+  const orbitTypeSel = document.getElementById("cfg-orbittype");
+  if (orbitTypeSel) {
+    orbitTypeSel.addEventListener("change", (e) => {
+      updateAltitudeForOrbitType(e.target.value);
+    });
+    updateAltitudeForOrbitType(orbitTypeSel.value);
+  }
+}
+var applyPresetWrapper = applyPreset;
 applyPreset = function(preset) {
-  originalApplyPreset(preset);
-  const orbitTypeSel2 = document.getElementById("cfg-orbittype");
-  if (orbitTypeSel2) {
-    orbitTypeSel2.value = preset.orbitType;
+  applyPresetWrapper(preset);
+  const orbitTypeSel = document.getElementById("cfg-orbittype");
+  if (orbitTypeSel) {
+    orbitTypeSel.value = preset.orbitType;
     updateAltitudeForOrbitType(preset.orbitType);
   }
 };
@@ -3036,7 +3041,7 @@ csvBtn.addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(url);
 });
-function applyPreset(preset) {
+var applyPreset = function(preset) {
   const setVal = (id, val) => {
     const el = document.getElementById(id);
     if (el) {
@@ -3061,7 +3066,7 @@ function applyPreset(preset) {
   setVal("cfg-sched", preset.scheduler);
   setVal("cfg-speedms", preset.roundDurationMs);
   setVal("cfg-seed", preset.seed);
-}
+};
 bindSlider("cfg-ues", "cfg-ues-val");
 bindSlider("cfg-rounds", "cfg-rounds-val");
 bindSlider("cfg-ksel", "cfg-ksel-val");
