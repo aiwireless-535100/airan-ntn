@@ -2255,7 +2255,9 @@ function createViewState(canvas) {
     center: { x: canvas.width / 2, y: canvas.height / 2 },
     scale: 1e-4,
     rotation: 0,
-    pitch: 0.5
+    pitch: 0.3,
+    isDragging: false,
+    lastMousePos: null
   };
 }
 function projectEcef(pos, view) {
@@ -2317,34 +2319,70 @@ function drawEarth(ctx, view) {
   ctx.beginPath();
   ctx.arc(earthPos.x, earthPos.y, earthRadius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#1a3a5c";
-  ctx.lineWidth = 0.5;
-  for (let lat = -60; lat <= 60; lat += 30) {
+  drawWireframeSphere(ctx, view, earthRadius, earthPos);
+}
+function drawWireframeSphere(ctx, view, radius, center) {
+  ctx.strokeStyle = "#2a5a8c";
+  ctx.lineWidth = 0.8;
+  ctx.globalAlpha = 0.6;
+  for (let lat = -75; lat <= 75; lat += 15) {
     const points = [];
     for (let lon = -180; lon <= 180; lon += 5) {
       const pos = llaToEcefVec(lat, lon, EARTH_RADIUS);
       const proj = projectEcef(pos, view);
       points.push({ x: proj.x, y: proj.y });
     }
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++)
-      ctx.lineTo(points[i].x, points[i].y);
-    ctx.stroke();
+    if (points.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++)
+        ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+    }
   }
-  for (let lon = -180; lon <= 180; lon += 60) {
+  for (let lon = -180; lon <= 180; lon += 30) {
     const points = [];
-    for (let lat = -80; lat <= 80; lat += 5) {
+    for (let lat = -85; lat <= 85; lat += 5) {
       const pos = llaToEcefVec(lat, lon, EARTH_RADIUS);
       const proj = projectEcef(pos, view);
       points.push({ x: proj.x, y: proj.y });
     }
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++)
-      ctx.lineTo(points[i].x, points[i].y);
-    ctx.stroke();
+    if (points.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++)
+        ctx.lineTo(points[i].x, points[i].y);
+      ctx.stroke();
+    }
   }
+  ctx.strokeStyle = "#4a90d9";
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.8;
+  const eqPoints = [];
+  for (let lon = -180; lon <= 180; lon += 5) {
+    const pos = llaToEcefVec(0, lon, EARTH_RADIUS);
+    const proj = projectEcef(pos, view);
+    eqPoints.push({ x: proj.x, y: proj.y });
+  }
+  ctx.beginPath();
+  ctx.moveTo(eqPoints[0].x, eqPoints[0].y);
+  for (let i = 1; i < eqPoints.length; i++)
+    ctx.lineTo(eqPoints[i].x, eqPoints[i].y);
+  ctx.stroke();
+  ctx.strokeStyle = "#4a90d9";
+  const pmPoints = [];
+  for (let lat = -85; lat <= 85; lat += 5) {
+    const pos = llaToEcefVec(lat, 0, EARTH_RADIUS);
+    const proj = projectEcef(pos, view);
+    pmPoints.push({ x: proj.x, y: proj.y });
+  }
+  ctx.beginPath();
+  ctx.moveTo(pmPoints[0].x, pmPoints[0].y);
+  for (let i = 1; i < pmPoints.length; i++)
+    ctx.lineTo(pmPoints[i].x, pmPoints[i].y);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
 }
 function llaToEcefVec(lat, lon, alt) {
   const latRad = lat * Math.PI / 180;
@@ -2865,6 +2903,73 @@ speedSlider.addEventListener("input", () => {
   msPerRound = 1e3 / parseFloat(speedSlider.value);
   speedVal.textContent = speedSlider.value + "\xD7";
 });
+topoCanvas.addEventListener("mousedown", (e) => {
+  if (viewState) {
+    viewState.isDragging = true;
+    viewState.lastMousePos = { x: e.clientX, y: e.clientY };
+    topoCanvas.style.cursor = "grabbing";
+  }
+});
+window.addEventListener("mousemove", (e) => {
+  if (viewState && viewState.isDragging && viewState.lastMousePos) {
+    const dx = e.clientX - viewState.lastMousePos.x;
+    const dy = e.clientY - viewState.lastMousePos.y;
+    viewState.rotation += dx * 5e-3;
+    viewState.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, viewState.pitch - dy * 5e-3));
+    viewState.lastMousePos = { x: e.clientX, y: e.clientY };
+    if (sim) {
+      const state2 = sim.getState();
+      setRenderState(state2);
+      renderTopology(topoCanvas.getContext("2d"), state2, viewState);
+      renderCharts(chartCanvas.getContext("2d"), state2.history, chartCanvas.width, chartCanvas.height);
+      renderSNRBars(snrCanvas.getContext("2d"), state2.ues, 0, 0, snrCanvas.width, snrCanvas.height);
+    }
+  }
+});
+window.addEventListener("mouseup", () => {
+  if (viewState) {
+    viewState.isDragging = false;
+    viewState.lastMousePos = null;
+    topoCanvas.style.cursor = "grab";
+  }
+});
+topoCanvas.addEventListener("mouseleave", () => {
+  if (viewState) {
+    viewState.isDragging = false;
+    viewState.lastMousePos = null;
+    topoCanvas.style.cursor = "grab";
+  }
+});
+topoCanvas.addEventListener("touchstart", (e) => {
+  if (viewState && e.touches.length === 1) {
+    viewState.isDragging = true;
+    viewState.lastMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+}, { passive: false });
+window.addEventListener("touchmove", (e) => {
+  if (viewState && viewState.isDragging && viewState.lastMousePos && e.touches.length === 1) {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - viewState.lastMousePos.x;
+    const dy = e.touches[0].clientY - viewState.lastMousePos.y;
+    viewState.rotation += dx * 5e-3;
+    viewState.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, viewState.pitch - dy * 5e-3));
+    viewState.lastMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    if (sim) {
+      const state2 = sim.getState();
+      setRenderState(state2);
+      renderTopology(topoCanvas.getContext("2d"), state2, viewState);
+      renderCharts(chartCanvas.getContext("2d"), state2.history, chartCanvas.width, chartCanvas.height);
+      renderSNRBars(snrCanvas.getContext("2d"), state2.ues, 0, 0, snrCanvas.width, snrCanvas.height);
+    }
+  }
+}, { passive: false });
+window.addEventListener("touchend", () => {
+  if (viewState) {
+    viewState.isDragging = false;
+    viewState.lastMousePos = null;
+  }
+});
+topoCanvas.style.cursor = "grab";
 presetSel.addEventListener("change", () => {
   const preset = SIM_PRESETS[presetSel.value];
   if (preset) {
