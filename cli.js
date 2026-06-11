@@ -1,3 +1,27 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
 // src/types.ts
 function vec3Add(a, b) {
   return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
@@ -173,21 +197,6 @@ var UE_PALETTE = [
   "#20a0c0",
   "#60a020"
 ];
-var SNR_THRESHOLDS = {
-  GOOD: 15,
-  // dB
-  MEDIUM: 5,
-  // dB
-  POOR: 0
-  // dB
-};
-function snrColor(snr) {
-  if (snr >= SNR_THRESHOLDS.GOOD)
-    return "#008855";
-  if (snr >= SNR_THRESHOLDS.MEDIUM)
-    return "#c89000";
-  return "#cc2233";
-}
 var XAPP_DEFAULTS = {
   "ho-predict": {
     priority: 10,
@@ -2070,9 +2079,9 @@ var AiranNtnSimulator = class {
   // Single FL Round
   // ──────────────────────────────────────────────────────────────────────────
   step() {
-    const { state: state2 } = this;
-    const { config, satellites, groundStations, ues, globalWeights } = state2;
-    state2.round++;
+    const { state } = this;
+    const { config, satellites, groundStations, ues, globalWeights } = state;
+    state.round++;
     const dt = config.roundDuration;
     const newSatellites = satellites.map((sat) => propagateSatellite(sat, dt));
     const islLinks = calculateISLLinks(newSatellites, config.maxISLRange * 1e3);
@@ -2084,43 +2093,43 @@ var AiranNtnSimulator = class {
     ueWalkStep(ues, newSatellites, config);
     refreshChannels(ues, newSatellites, config, dt);
     for (const sat of newSatellites) {
-      const report = generateKpmReport(sat, ues, config, state2.round);
-      if (!state2.kpmDatabase.has(sat.id)) {
-        state2.kpmDatabase.set(sat.id, []);
+      const report = generateKpmReport(sat, ues, config, state.round);
+      if (!state.kpmDatabase.has(sat.id)) {
+        state.kpmDatabase.set(sat.id, []);
       }
-      const db = state2.kpmDatabase.get(sat.id);
+      const db = state.kpmDatabase.get(sat.id);
       db.push(report);
       if (db.length > 10)
         db.shift();
     }
     const k = Math.min(config.selectedPerRound, ues.length);
-    const participants = selectUEs(this.scheduler, ues, k, state2.round, newSatellites, config);
+    const participants = selectUEs(this.scheduler, ues, k, state.round, newSatellites, config);
     const selectedIds = new Set(participants.map((u) => u.id));
     ues.forEach((u) => {
       u.selected = selectedIds.has(u.id);
     });
     participants.forEach((u) => {
-      u.lastRound = state2.round;
+      u.lastRound = state.round;
     });
     const data = partitionData(config);
     for (const ue of participants) {
       const localData = data.get(ue.id) ?? [];
       this.flStrategy.localTrain(ue, globalWeights, localData, config);
     }
-    state2.globalWeights = this.flStrategy.aggregate(globalWeights, participants, data, config);
+    state.globalWeights = this.flStrategy.aggregate(globalWeights, participants, data, config);
     const allSamples = [];
     for (const [, samples] of data)
       allSamples.push(...samples);
-    const globalLoss = this.evaluateLoss(allSamples, state2.globalWeights);
-    const globalAccuracy = this.evaluateAccuracy(allSamples, state2.globalWeights);
-    const xappActions = runXAppCycle(this.xApps, state2.kpmDatabase, newSatellites, ues, config, state2.round);
-    state2.pendingActions.push(...xappActions);
+    const globalLoss = this.evaluateLoss(allSamples, state.globalWeights);
+    const globalAccuracy = this.evaluateAccuracy(allSamples, state.globalWeights);
+    const xappActions = runXAppCycle(this.xApps, state.kpmDatabase, newSatellites, ues, config, state.round);
+    state.pendingActions.push(...xappActions);
     if (config.spaceRicEnabled) {
-      const spaceRicResult = runSpaceRicCycle(state2.spaceRics, newSatellites, ues, config, state2.round);
-      state2.pendingActions.push(...spaceRicResult.actions);
+      const spaceRicResult = runSpaceRicCycle(state.spaceRics, newSatellites, ues, config, state.round);
+      state.pendingActions.push(...spaceRicResult.actions);
     }
-    this.executeActions(state2.pendingActions, newSatellites, ues);
-    state2.pendingActions = [];
+    this.executeActions(state.pendingActions, newSatellites, ues);
+    state.pendingActions = [];
     const snrs = participants.map((u) => u.snr);
     const avgSNR = snrs.length > 0 ? snrs.reduce((a, b) => a + b, 0) / snrs.length : 0;
     const minSNR = snrs.length > 0 ? Math.min(...snrs) : 0;
@@ -2136,12 +2145,12 @@ var AiranNtnSimulator = class {
     const totalBits = participants.reduce((s, u) => s + commCostBits(nParams, u.snr), 0);
     let handovers = 0;
     for (const ue of ues) {
-      if (ue.servingSatId !== ue.bsId && ue.lastRound === state2.round)
+      if (ue.servingSatId !== ue.bsId && ue.lastRound === state.round)
         handovers++;
     }
     const satelliteEnergy = newSatellites.reduce((s, sat) => s + (sat.solarPower - 200) * dt / 3600, 0);
     const metrics = {
-      round: state2.round,
+      round: state.round,
       selectedIds: participants.map((u) => u.id),
       globalLoss,
       globalAccuracy,
@@ -2155,8 +2164,8 @@ var AiranNtnSimulator = class {
       handovers,
       satelliteEnergy
     };
-    state2.history.push(metrics);
-    state2.satellites = newSatellites;
+    state.history.push(metrics);
+    state.satellites = newSatellites;
     return metrics;
   }
   // ──────────────────────────────────────────────────────────────────────────
@@ -2248,702 +2257,209 @@ var AiranNtnSimulator = class {
   }
 };
 
-// src/renderer.ts
-var ORBIT_SEGMENTS = 64;
-function createViewState(canvas) {
-  return {
-    center: { x: canvas.width / 2, y: canvas.height / 2 },
-    scale: 1e-4,
-    rotation: 0,
-    pitch: 0.5
-  };
-}
-function projectEcef(pos, view) {
-  const cosR = Math.cos(view.rotation);
-  const sinR = Math.sin(view.rotation);
-  const cosP = Math.cos(view.pitch);
-  const sinP = Math.sin(view.pitch);
-  const x1 = pos.x * cosR - pos.y * sinR;
-  const y1 = pos.x * sinR + pos.y * cosR;
-  const z1 = pos.z;
-  const y2 = y1 * cosP - z1 * sinP;
-  const z2 = y1 * sinP + z1 * cosP;
-  return {
-    x: view.center.x + x1 * view.scale,
-    y: view.center.y - y2 * view.scale,
-    z: z2 * view.scale
-  };
-}
-function renderTopology(ctx, state2, view, showOrbits = true, showISL = true, showTrails = true) {
-  const { satellites, groundStations, ues } = state2;
-  const { width, height } = ctx.canvas;
-  ctx.fillStyle = "#0a0a1a";
-  ctx.fillRect(0, 0, width, height);
-  drawEarth(ctx, view);
-  if (showOrbits) {
-    drawOrbitalPaths(ctx, satellites, view);
-  }
-  if (showISL) {
-    drawISLLinks(ctx, satellites, view);
-  }
-  drawFeederLinks(ctx, satellites, groundStations, view);
-  drawGroundStations(ctx, groundStations, view);
-  drawSatellites(ctx, satellites, view);
-  if (showTrails) {
-    drawUETrails(ctx, ues, view);
-  }
-  drawUEs(ctx, ues, view);
-  drawLegend(ctx, view);
-}
-function drawEarth(ctx, view) {
-  const earthPos = projectEcef({ x: 0, y: 0, z: 0 }, view);
-  const earthRadius = EARTH_RADIUS * view.scale;
-  const gradient = ctx.createRadialGradient(
-    earthPos.x,
-    earthPos.y,
-    0,
-    earthPos.x,
-    earthPos.y,
-    earthRadius * 1.5
-  );
-  gradient.addColorStop(0, "#1a3a5c");
-  gradient.addColorStop(0.5, "#0a1a3a");
-  gradient.addColorStop(1, "#000000");
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(earthPos.x, earthPos.y, earthRadius * 1.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#0d1f3a";
-  ctx.beginPath();
-  ctx.arc(earthPos.x, earthPos.y, earthRadius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#1a3a5c";
-  ctx.lineWidth = 0.5;
-  for (let lat = -60; lat <= 60; lat += 30) {
-    const points = [];
-    for (let lon = -180; lon <= 180; lon += 5) {
-      const pos = llaToEcefVec(lat, lon, EARTH_RADIUS);
-      const proj = projectEcef(pos, view);
-      points.push({ x: proj.x, y: proj.y });
-    }
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++)
-      ctx.lineTo(points[i].x, points[i].y);
-    ctx.stroke();
-  }
-  for (let lon = -180; lon <= 180; lon += 60) {
-    const points = [];
-    for (let lat = -80; lat <= 80; lat += 5) {
-      const pos = llaToEcefVec(lat, lon, EARTH_RADIUS);
-      const proj = projectEcef(pos, view);
-      points.push({ x: proj.x, y: proj.y });
-    }
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++)
-      ctx.lineTo(points[i].x, points[i].y);
-    ctx.stroke();
-  }
-}
-function llaToEcefVec(lat, lon, alt) {
-  const latRad = lat * Math.PI / 180;
-  const lonRad = lon * Math.PI / 180;
-  const N = EARTH_RADIUS / Math.sqrt(1 - 669438e-8 * Math.sin(latRad) ** 2);
-  return {
-    x: (N + alt) * Math.cos(latRad) * Math.cos(lonRad),
-    y: (N + alt) * Math.cos(latRad) * Math.sin(lonRad),
-    z: (N * (1 - 669438e-8) + alt) * Math.sin(latRad)
-  };
-}
-function drawOrbitalPaths(ctx, satellites, view) {
-  if (satellites.length === 0)
-    return;
-  const planes = /* @__PURE__ */ new Map();
-  for (const sat of satellites) {
-    const raan = sat.orbitalElements.raan;
-    const planeKey = Math.round(raan * 180 / Math.PI / 5) * 5;
-    if (!planes.has(planeKey))
-      planes.set(planeKey, []);
-    planes.get(planeKey).push(sat);
-  }
-  ctx.strokeStyle = "#004466";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([5, 5]);
-  for (const [, planeSats] of planes) {
-    if (planeSats.length < 2)
-      continue;
-    planeSats.sort((a, b) => a.orbitalElements.trueAnomaly - b.orbitalElements.trueAnomaly);
-    ctx.beginPath();
-    for (let i = 0; i <= ORBIT_SEGMENTS; i++) {
-      const frac = i / ORBIT_SEGMENTS;
-      const anomaly = frac * Math.PI * 2;
-      const a = planeSats[0].orbitalElements.semiMajorAxis;
-      const inc = planeSats[0].orbitalElements.inclination;
-      const raan = planeSats[0].orbitalElements.raan;
-      const xOrb = a * Math.cos(anomaly);
-      const yOrb = a * Math.sin(anomaly);
-      const cosR = Math.cos(raan), sinR = Math.sin(raan);
-      const cosI = Math.cos(inc), sinI = Math.sin(inc);
-      const x = xOrb * cosR - yOrb * sinR * cosI;
-      const y = xOrb * sinR + yOrb * cosR * cosI;
-      const z = yOrb * sinI;
-      const proj = projectEcef({ x, y, z }, view);
-      if (i === 0)
-        ctx.moveTo(proj.x, proj.y);
-      else
-        ctx.lineTo(proj.x, proj.y);
-    }
-    ctx.closePath();
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
-}
-function drawISLLinks(ctx, satellites, view) {
-  ctx.strokeStyle = "#00ffff";
-  ctx.lineWidth = 0.5;
-  ctx.globalAlpha = 0.6;
-  const drawn = /* @__PURE__ */ new Set();
-  for (const sat of satellites) {
-    for (const link of sat.islLinks) {
-      const key = `${Math.min(sat.id, link.neighborId)}-${Math.max(sat.id, link.neighborId)}`;
-      if (drawn.has(key))
-        continue;
-      drawn.add(key);
-      const neighbor = satellites.find((s) => s.id === link.neighborId);
-      if (!neighbor)
-        continue;
-      const p1 = projectEcef(sat.position, view);
-      const p2 = projectEcef(neighbor.position, view);
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.stroke();
+// src/cli.ts
+var import_fs = require("fs");
+var import_path = require("path");
+var import_url = require("url");
+var import_path2 = require("path");
+var import_meta = {};
+var __filename = typeof import_meta !== "undefined" && import_meta.url ? (0, import_url.fileURLToPath)(import_meta.url) : process.argv[1];
+var __dirname = (0, import_path2.dirname)(__filename);
+function parseArgs() {
+  const args = {};
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    const next = argv[i + 1];
+    switch (arg) {
+      case "--preset":
+      case "-p":
+        args.preset = next;
+        i++;
+        break;
+      case "--config":
+      case "-c":
+        args.config = next;
+        i++;
+        break;
+      case "--output":
+      case "-o":
+        args.output = next;
+        i++;
+        break;
+      case "--rounds":
+      case "-r":
+        args.rounds = parseInt(next, 10);
+        i++;
+        break;
+      case "--ues":
+      case "-u":
+        args.ues = parseInt(next, 10);
+        i++;
+        break;
+      case "--orbitals":
+        args.orbitals = parseInt(next, 10);
+        i++;
+        break;
+      case "--planes":
+        args.planes = parseInt(next, 10);
+        i++;
+        break;
+      case "--seed":
+        args.seed = parseInt(next, 10);
+        i++;
+        break;
+      case "--quiet":
+      case "-q":
+        args.quiet = true;
+        break;
+      case "--csv":
+        args.csv = true;
+        break;
+      case "--json":
+        args.json = true;
+        break;
+      case "--help":
+      case "-h":
+        printHelp();
+        process.exit(0);
     }
   }
-  ctx.globalAlpha = 1;
-  ctx.setLineDash([]);
+  return args;
 }
-function drawFeederLinks(ctx, satellites, groundStations, view) {
-  ctx.strokeStyle = "#ffaa00";
-  ctx.lineWidth = 1;
-  ctx.globalAlpha = 0.8;
-  for (const sat of satellites) {
-    if (!sat.feederLink || !sat.feederLink.active)
-      continue;
-    const gs = groundStations.find((g) => g.id === sat.feederLink.groundStationId);
-    if (!gs)
-      continue;
-    const p1 = projectEcef(sat.position, view);
-    const p2 = projectEcef(gs.position, view);
-    ctx.setLineDash([10, 5]);
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-  ctx.globalAlpha = 1;
-}
-function drawGroundStations(ctx, gss, view) {
-  for (const gs of gss) {
-    const proj = projectEcef(gs.position, view);
-    const size = 8;
-    ctx.fillStyle = "#666";
-    ctx.fillRect(proj.x - 2, proj.y - size, 4, size);
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    for (let i = 0; i < gs.antennas; i++) {
-      const angle = i / gs.antennas * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(proj.x, proj.y - size);
-      ctx.lineTo(proj.x + Math.cos(angle) * 6, proj.y - size - Math.sin(angle) * 6);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "#fff";
-    ctx.font = "9px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(gs.name, proj.x, proj.y - size - 10);
-  }
-}
-function drawSatellites(ctx, sats, view) {
-  for (const sat of sats) {
-    const proj = projectEcef(sat.position, view);
-    ctx.fillStyle = sat.color;
-    ctx.beginPath();
-    ctx.arc(proj.x, proj.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowColor = sat.color;
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.arc(proj.x, proj.y, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = sat.state === "ECLIPSE" ? "#7b4fcf" : sat.state === "FEEDER_OUTAGE" ? "#cc2233" : sat.state === "AUTONOMOUS" ? "#e07030" : "#008855";
-    ctx.beginPath();
-    ctx.arc(proj.x + 5, proj.y - 5, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = sat.color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(proj.x - 8, proj.y);
-    ctx.lineTo(proj.x - 12, proj.y - 4);
-    ctx.moveTo(proj.x + 8, proj.y);
-    ctx.lineTo(proj.x + 12, proj.y + 4);
-    ctx.stroke();
-    ctx.fillStyle = "#fff";
-    ctx.font = "8px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(sat.name, proj.x, proj.y + 14);
-  }
-}
-function drawUETrails(ctx, ues, view) {
-  ctx.lineWidth = 1;
-  ctx.globalAlpha = 0.4;
-  for (const ue of ues) {
-    if (ue.trail.length < 2)
-      continue;
-    const color = ue.color;
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    const first = projectEcef(ue.trail[0], view);
-    ctx.moveTo(first.x, first.y);
-    for (let i = 1; i < ue.trail.length; i++) {
-      const p = projectEcef(ue.trail[i], view);
-      ctx.lineTo(p.x, p.y);
-    }
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-}
-function drawUEs(ctx, ues, view) {
-  for (const ue of ues) {
-    const proj = projectEcef(ue.position, view);
-    ctx.fillStyle = ue.selected ? "#ffff00" : ue.color;
-    ctx.beginPath();
-    ctx.arc(proj.x, proj.y, ue.selected ? 5 : 3, 0, Math.PI * 2);
-    ctx.fill();
-    const snrCol = snrColor(ue.snr);
-    ctx.strokeStyle = snrCol;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(proj.x, proj.y, ue.selected ? 7 : 5, 0, Math.PI * 2);
-    ctx.stroke();
-    if (ue.velocity.x !== 0 || ue.velocity.y !== 0) {
-      const speed = Math.sqrt(ue.velocity.x ** 2 + ue.velocity.y ** 2);
-      if (speed > 0.01) {
-        const velProj = projectEcef(
-          { x: ue.position.x + ue.velocity.x * 1e3, y: ue.position.y + ue.velocity.y * 1e3, z: ue.position.z },
-          view
-        );
-        ctx.strokeStyle = ue.color;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(proj.x, proj.y);
-        ctx.lineTo(velProj.x, velProj.y);
-        ctx.stroke();
-        const angle = Math.atan2(velProj.y - proj.y, velProj.x - proj.x);
-        ctx.beginPath();
-        ctx.moveTo(velProj.x, velProj.y);
-        ctx.lineTo(velProj.x - Math.cos(angle - 0.5) * 5, velProj.y - Math.sin(angle - 0.5) * 5);
-        ctx.lineTo(velProj.x - Math.cos(angle + 0.5) * 5, velProj.y - Math.sin(angle + 0.5) * 5);
-        ctx.closePath();
-        ctx.fillStyle = ue.color;
-        ctx.fill();
-      }
-    }
-    if (ue.servingSatId !== null) {
-      const sat = state?.satellites.find((s) => s.id === ue.servingSatId);
-      if (sat) {
-        const satProj = projectEcef(sat.position, view);
-        ctx.strokeStyle = snrCol;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.moveTo(proj.x, proj.y);
-        ctx.lineTo(satProj.x, satProj.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    }
-  }
-}
-var state = null;
-function setRenderState(s) {
-  state = s;
-}
-function drawLegend(ctx, view) {
-  const padding = 10;
-  const x = view.center.x * 2 - 200;
-  const y = padding;
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
-  ctx.fillRect(x - 5, y - 5, 190, 120);
-  ctx.fillStyle = "#fff";
-  ctx.font = "10px monospace";
-  ctx.textAlign = "left";
-  const items = [
-    { color: "#00ffff", label: "ISL Links" },
-    { color: "#ffaa00", label: "Feeder Links" },
-    { color: "#008855", label: "SNR Good" },
-    { color: "#c89000", label: "SNR Medium" },
-    { color: "#cc2233", label: "SNR Poor" },
-    { color: "#ffff00", label: "Selected UE" }
-  ];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    ctx.fillStyle = item.color;
-    ctx.fillRect(x, y + i * 18, 12, 12);
-    ctx.fillStyle = "#fff";
-    ctx.fillText(item.label, x + 18, y + i * 18 + 10);
-  }
-}
-function renderCharts(ctx, history, canvasWidth, canvasHeight) {
-  if (history.length === 0)
-    return;
-  const margin = 40;
-  const chartWidth = canvasWidth - margin * 2;
-  const chartHeight = 120;
-  const startY = canvasHeight - chartHeight - margin;
-  drawChart(ctx, history, "globalLoss", margin, startY, chartWidth, chartHeight, "#ff4444", "Loss");
-  drawChart(ctx, history, "globalAccuracy", margin, startY - chartHeight - 10, chartWidth, chartHeight, "#44ff44", "Accuracy (%)");
-  drawChart(ctx, history, "avgSNR", margin, startY - 2 * (chartHeight + 10), chartWidth, chartHeight, "#44aaff", "Avg SNR (dB)");
-}
-function drawChart(ctx, history, metric, x, y, width, height, color, label) {
-  if (history.length < 2)
-    return;
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.fillRect(x, y, width, height);
-  ctx.strokeStyle = "#444";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x, y + height);
-  ctx.lineTo(x + width, y + height);
-  ctx.moveTo(x, y);
-  ctx.lineTo(x, y + height);
-  ctx.stroke();
-  const values = history.map((h) => h[metric]);
-  const minVal = Math.min(...values);
-  const maxVal = Math.max(...values);
-  const range = maxVal - minVal || 1;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let i = 0; i < values.length; i++) {
-    const px = x + i / (values.length - 1) * width;
-    const py = y + height - (values[i] - minVal) / range * height;
-    if (i === 0)
-      ctx.moveTo(px, py);
-    else
-      ctx.lineTo(px, py);
-  }
-  ctx.stroke();
-  ctx.fillStyle = color;
-  ctx.font = "10px monospace";
-  ctx.fillText(`${label}: ${values[values.length - 1].toFixed(2)}`, x + 5, y + 15);
-}
-function renderSNRBars(ctx, ues, x, y, width, height) {
-  const barWidth = width / Math.max(1, ues.length);
-  const maxSNR = 30;
-  ctx.fillStyle = "rgba(0,0,0,0.5)";
-  ctx.fillRect(x, y, width, height);
-  for (let i = 0; i < ues.length; i++) {
-    const ue = ues[i];
-    const barHeight = Math.max(0, ue.snr / maxSNR * height);
-    const bx = x + i * barWidth + 1;
-    const by = y + height - barHeight;
-    ctx.fillStyle = snrColor(ue.snr);
-    ctx.fillRect(bx, by, barWidth - 2, barHeight);
-  }
-  ctx.fillStyle = "#fff";
-  ctx.font = "8px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("UE SNR", x + width / 2, y - 5);
-}
+function printHelp() {
+  console.log(`
+airan-ntn \u2014 O-RAN NTN Simulator CLI
 
-// src/main.ts
-var topoCanvas = document.getElementById("topo");
-var chartCanvas = document.getElementById("chart");
-var snrCanvas = document.getElementById("snr-bars");
-var runBtn = document.getElementById("run-btn");
-var rstBtn = document.getElementById("rst-btn");
-var phaseEl = document.getElementById("phase");
-var roundEl = document.getElementById("round-num");
-var totalEl = document.getElementById("total-rounds");
-var lossEl = document.getElementById("stat-loss");
-var accEl = document.getElementById("stat-acc");
-var snrEl = document.getElementById("stat-snr");
-var selEl = document.getElementById("stat-sel");
-var commEl = document.getElementById("stat-comm");
-var elevEl = document.getElementById("stat-elev");
-var dopplerEl = document.getElementById("stat-doppler");
-var feederEl = document.getElementById("stat-feeder");
-var speedSlider = document.getElementById("speed");
-var speedVal = document.getElementById("speed-val");
-var csvBtn = document.getElementById("csv-btn");
-var presetSel = document.getElementById("preset");
-var sim = null;
-var animFrame = null;
-var msPerRound = 300;
-var viewState;
-function readConfig() {
-  const v = (id) => document.getElementById(id)?.value;
-  const n = (id) => parseFloat(v(id) ?? "0");
-  const b = (id) => document.getElementById(id)?.checked ?? false;
-  const xappSel = document.getElementById("cfg-xapps");
-  const enabledXApps = Array.from(xappSel?.selectedOptions || []).map((o) => o.value);
-  return {
-    // Constellation
-    numOrbitals: n("cfg-orbitals"),
-    numPlanes: n("cfg-planes"),
-    inclination: n("cfg-inclination"),
-    altitude: n("cfg-altitude"),
-    orbitType: v("cfg-orbittype"),
-    // ISL
-    enableISL: b("cfg-isl"),
-    maxISLRange: n("cfg-islrange"),
-    islType: v("cfg-isltype"),
-    // Ground stations
-    numGroundStations: n("cfg-gs"),
-    gsPositions: DEFAULT_CONFIG.gsPositions,
-    // Channel
-    carrierFreqGHz: n("cfg-freq"),
-    bandwidthMHz: n("cfg-bw"),
-    channelModel: v("cfg-channel"),
-    pathLossExponent: n("cfg-ple"),
-    shadowingStd: n("cfg-shadow"),
-    ricianK: n("cfg-rician"),
-    snrThreshold: n("cfg-snrthr"),
-    dopplerEnabled: b("cfg-doppler"),
-    // Mobility
-    numUEs: n("cfg-ues"),
-    ueSpeed: n("cfg-uespeed"),
-    walkEnabled: b("cfg-walk"),
-    walkSpeed: n("cfg-walkspeed"),
-    roundDuration: n("cfg-rounddur"),
-    levyAlpha: n("cfg-levyalpha"),
-    levyBeta: n("cfg-levybeta"),
-    levyMinStep: n("cfg-levymin"),
-    // FL
-    flAlgorithm: v("cfg-fl"),
-    scheduler: v("cfg-sched"),
-    localEpochs: n("cfg-epochs"),
-    learningRate: n("cfg-lr"),
-    mu: n("cfg-mu"),
-    selectedPerRound: n("cfg-ksel"),
-    totalRounds: n("cfg-rounds"),
-    numFeatures: n("cfg-features"),
-    numClasses: n("cfg-classes"),
-    samplesPerUE: n("cfg-samples"),
-    nonIIDAlpha: n("cfg-alpha"),
-    bsCooperation: b("cfg-coop"),
-    // NTN-specific FL
-    ntnAwareScheduling: b("cfg-ntn-sched"),
-    minElevationDeg: n("cfg-minelev"),
-    maxDopplerHz: n("cfg-maxdoppler"),
-    requireFeederLink: b("cfg-feederreq"),
-    // Space RIC
-    spaceRicEnabled: b("cfg-spaceric"),
-    autonomousMode: b("cfg-auto"),
-    feederOutageThreshold: n("cfg-feederthr"),
-    modelSyncInterval: n("cfg-syncint"),
-    islCoordination: b("cfg-islcoord"),
-    gradientCompression: n("cfg-gradcomp"),
-    eclipseAwareFl: b("cfg-eclipsefl"),
-    // xApps
-    enabledXApps,
-    // Simulation
-    roundDurationMs: n("cfg-speedms"),
-    seed: n("cfg-seed")
-  };
+Usage: airan-ntn [options]
+
+Options:
+  -p, --preset <name>     Preset configuration (demo, standard, large, geo, fl_focused)
+  -c, --config <file>     Load JSON config file
+  -o, --output <file>     Output file for results
+  -r, --rounds <n>        Total FL rounds
+  -u, --ues <n>           Number of UEs
+  --orbitals <n>          Satellites per orbital plane
+  --planes <n>            Number of orbital planes
+  --seed <n>              Random seed
+  -q, --quiet             Suppress progress output
+  --csv                   Output CSV to stdout
+  --json                  Output JSON to stdout
+  -h, --help              Show this help
+
+Presets:
+  demo           Quick demo (6\xD73 sats, 10 UEs, 20 rounds)
+  standard       Starlink-like (12\xD76 sats, 20 UEs, 50 rounds)
+  large          Full constellation (22\xD76 sats, 50 UEs, 100 rounds)
+  geo            3 GEO satellites (1\xD73 sats, 15 UEs, 30 rounds)
+  fl_focused     FL-heavy (8\xD74 sats, 40 UEs, 100 rounds)
+
+Examples:
+  airan-ntn --preset standard --rounds 100 --output results.json
+  airan-ntn -p demo --csv > rounds.csv
+  airan-ntn --config myconfig.json --json
+`);
 }
-function bindSlider(id, valId, fmt = (v) => String(v)) {
-  const el = document.getElementById(id);
-  const lbl = document.getElementById(valId);
-  if (!el || !lbl)
-    return;
-  const update = () => {
-    lbl.textContent = fmt(parseFloat(el.value));
-  };
-  el.addEventListener("input", update);
-  update();
-}
-function initSim() {
-  const cfg = readConfig();
-  sim = new AiranNtnSimulator(cfg);
-  setRenderState(sim.getState());
-  totalEl.textContent = String(cfg.totalRounds);
-  roundEl.textContent = "0";
-  phaseEl.textContent = "idle";
-  phaseEl.className = "hdr-phase";
-  lossEl.textContent = "\u2014";
-  accEl.textContent = "\u2014";
-  snrEl.textContent = "\u2014";
-  selEl.textContent = "\u2014";
-  commEl.textContent = "\u2014";
-  elevEl.textContent = "\u2014";
-  dopplerEl.textContent = "\u2014";
-  feederEl.textContent = "\u2014";
-  resizeCanvases();
-  renderTopology(topoCanvas.getContext("2d"), sim.getState(), viewState);
-  chartCanvas.getContext("2d").clearRect(0, 0, chartCanvas.width, chartCanvas.height);
-  snrCanvas.getContext("2d").clearRect(0, 0, snrCanvas.width, snrCanvas.height);
-}
-function resizeCanvases() {
-  const dpi = window.devicePixelRatio || 1;
-  [topoCanvas, chartCanvas, snrCanvas].forEach((c) => {
-    c.width = c.clientWidth * dpi;
-    c.height = c.clientHeight * dpi;
-    c.getContext("2d").scale(dpi, dpi);
-  });
-  viewState = createViewState(topoCanvas);
-}
-window.addEventListener("resize", () => {
-  resizeCanvases();
-  if (sim)
-    renderTopology(topoCanvas.getContext("2d"), sim.getState(), viewState);
-});
-function updateUI(m) {
-  const state2 = sim.getState();
-  roundEl.textContent = String(m.round);
-  lossEl.textContent = m.globalLoss.toFixed(4);
-  accEl.textContent = (m.globalAccuracy * 100).toFixed(1) + "%";
-  snrEl.textContent = m.avgSNR.toFixed(1) + " dB";
-  selEl.textContent = `${m.selectedIds.length}/${state2.ues.length}`;
-  commEl.textContent = (m.commCostBits / 1e6).toFixed(2) + " Mbits";
-  elevEl.textContent = m.avgElevation.toFixed(1) + "\xB0";
-  dopplerEl.textContent = (m.avgDoppler / 1e3).toFixed(1) + " kHz";
-  feederEl.textContent = (m.feederLinkUptime * 100).toFixed(0) + "%";
-  renderTopology(topoCanvas.getContext("2d"), state2, viewState);
-  renderCharts(chartCanvas.getContext("2d"), state2.history, chartCanvas.width, chartCanvas.height);
-  renderSNRBars(snrCanvas.getContext("2d"), state2.ues, 0, 0, snrCanvas.width, snrCanvas.height);
-  if (m.round >= state2.config.totalRounds) {
-    phaseEl.textContent = "done";
-    phaseEl.className = "hdr-phase agg";
+async function buildConfig(args) {
+  let config = { ...DEFAULT_CONFIG };
+  if (args.preset && SIM_PRESETS[args.preset]) {
+    config = { ...config, ...SIM_PRESETS[args.preset] };
   }
+  if (args.config) {
+    try {
+      const { readFileSync } = await import("fs");
+      const fileConfig = JSON.parse(readFileSync(args.config, "utf-8"));
+      config = { ...config, ...fileConfig };
+    } catch (e) {
+      console.error(`Failed to load config: ${e}`);
+      process.exit(1);
+    }
+  }
+  if (args.rounds !== void 0)
+    config.totalRounds = args.rounds;
+  if (args.ues !== void 0)
+    config.numUEs = args.ues;
+  if (args.orbitals !== void 0)
+    config.numOrbitals = args.orbitals;
+  if (args.planes !== void 0)
+    config.numPlanes = args.planes;
+  if (args.seed !== void 0)
+    config.seed = args.seed;
+  return config;
 }
-function tick() {
-  if (!sim || sim.isDone) {
-    phaseEl.textContent = "done";
-    phaseEl.className = "hdr-phase agg";
-    runBtn.textContent = "\u25B6 START";
-    runBtn.disabled = false;
-    animFrame = null;
-    return;
-  }
-  phaseEl.textContent = "training";
-  phaseEl.className = "hdr-phase upload";
-  const m = sim.step();
-  updateUI(m);
-  animFrame = setTimeout(tick, msPerRound);
-}
-runBtn.addEventListener("click", () => {
-  if (animFrame) {
-    clearTimeout(animFrame);
-    animFrame = null;
-    runBtn.textContent = "\u25B6 START";
-    runBtn.disabled = false;
-    phaseEl.textContent = "paused";
-    phaseEl.className = "hdr-phase";
-  } else {
-    if (sim?.isDone)
-      initSim();
-    runBtn.textContent = "\u23F8 PAUSE";
-    runBtn.disabled = false;
-    tick();
-  }
-});
-rstBtn.addEventListener("click", () => {
-  if (animFrame) {
-    clearTimeout(animFrame);
-    animFrame = null;
-  }
-  initSim();
-  runBtn.textContent = "\u25B6 START";
-  runBtn.disabled = false;
-});
-speedSlider.addEventListener("input", () => {
-  msPerRound = 1e3 / parseFloat(speedSlider.value);
-  speedVal.textContent = speedSlider.value + "\xD7";
-});
-presetSel.addEventListener("change", () => {
-  const preset = SIM_PRESETS[presetSel.value];
-  if (preset) {
-    applyPreset(preset);
-  }
-});
-csvBtn.addEventListener("click", () => {
-  if (!sim)
-    return;
-  const history = sim.getState().history;
-  const headers = ["round", "loss", "accuracy", "avgSNR", "minSNR", "participation", "commBits", "avgElev", "avgDoppler", "feederUptime", "handovers", "satEnergy"];
-  const rows = history.map((m) => [
-    m.round,
-    m.globalLoss,
-    m.globalAccuracy,
-    m.avgSNR,
-    m.minSNR,
-    m.participationRate,
-    m.commCostBits,
-    m.avgElevation,
-    m.avgDoppler,
-    m.feederLinkUptime,
-    m.handovers,
-    m.satelliteEnergy
-  ]);
-  const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `airan-ntn-rounds-${Date.now()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-});
-function applyPreset(preset) {
-  const setVal = (id, val) => {
-    const el = document.getElementById(id);
-    if (el) {
-      if (el.type === "checkbox")
-        el.checked = val;
-      else
-        el.value = String(val);
-      el.dispatchEvent(new Event("input"));
+function createProgressCallback(quiet) {
+  let lastLog = 0;
+  return (m) => {
+    if (quiet)
+      return;
+    const now = Date.now();
+    if (now - lastLog > 1e3 || m.round === 1) {
+      console.log(`Round ${m.round}: Loss=${m.globalLoss.toFixed(4)}, Acc=${(m.globalAccuracy * 100).toFixed(1)}%, SNR=${m.avgSNR.toFixed(1)}dB, Feeder=${(m.feederLinkUptime * 100).toFixed(0)}%`);
+      lastLog = now;
     }
   };
-  setVal("cfg-orbitals", preset.numOrbitals);
-  setVal("cfg-planes", preset.numPlanes);
-  setVal("cfg-inclination", preset.inclination);
-  setVal("cfg-altitude", preset.altitude);
-  setVal("cfg-orbittype", preset.orbitType);
-  setVal("cfg-ues", preset.numUEs);
-  setVal("cfg-rounds", preset.totalRounds);
-  setVal("cfg-ksel", preset.selectedPerRound);
-  setVal("cfg-epochs", preset.localEpochs);
-  setVal("cfg-lr", preset.learningRate);
-  setVal("cfg-fl", preset.flAlgorithm);
-  setVal("cfg-sched", preset.scheduler);
-  setVal("cfg-speedms", preset.roundDurationMs);
-  setVal("cfg-seed", preset.seed);
 }
-bindSlider("cfg-ues", "cfg-ues-val");
-bindSlider("cfg-rounds", "cfg-rounds-val");
-bindSlider("cfg-ksel", "cfg-ksel-val");
-bindSlider("cfg-epochs", "cfg-epochs-val");
-bindSlider("cfg-lr", "cfg-lr-val", (v) => v.toFixed(3));
-bindSlider("cfg-speedms", "cfg-speedms-val", (v) => v + "ms");
-bindSlider("cfg-seed", "cfg-seed-val");
-bindSlider("cfg-orbital", "cfg-orbital-val");
-bindSlider("cfg-planes", "cfg-planes-val");
-bindSlider("cfg-inclination", "cfg-inclination-val", (v) => v + "\xB0");
-bindSlider("cfg-altitude", "cfg-altitude-val", (v) => v + "km");
-bindSlider("cfg-freq", "cfg-freq-val", (v) => v + "GHz");
-bindSlider("cfg-bw", "cfg-bw-val", (v) => v + "MHz");
-bindSlider("cfg-levyalpha", "cfg-levyalpha-val", (v) => v.toFixed(2));
-bindSlider("cfg-alpha", "cfg-alpha-val", (v) => v.toFixed(2));
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initSim);
-} else {
-  initSim();
+async function main() {
+  const args = parseArgs();
+  const config = await buildConfig(args);
+  if (!args.quiet) {
+    console.log("airan-ntn simulator starting...");
+    console.log(`Config: ${config.numOrbitals}\xD7${config.numPlanes} sats, ${config.numUEs} UEs, ${config.totalRounds} rounds`);
+    console.log(`FL: ${config.flAlgorithm}/${config.scheduler}, Seed: ${config.seed}`);
+  }
+  const sim = new AiranNtnSimulator(config);
+  const onRound = createProgressCallback(args.quiet ?? false);
+  const startTime = Date.now();
+  const history = sim.runAll(onRound);
+  const elapsed = Date.now() - startTime;
+  if (!args.quiet) {
+    console.log(`
+Completed in ${(elapsed / 1e3).toFixed(1)}s`);
+    const final = history[history.length - 1];
+    console.log(`Final: Loss=${final.globalLoss.toFixed(4)}, Acc=${(final.globalAccuracy * 100).toFixed(1)}%`);
+    console.log(`Avg SNR: ${final.avgSNR.toFixed(1)}dB, Feeder uptime: ${(final.feederLinkUptime * 100).toFixed(1)}%`);
+    console.log(`Handovers: ${final.handovers}, Sat energy: ${final.satelliteEnergy.toFixed(1)} Wh`);
+  }
+  const output = {
+    config,
+    history,
+    summary: {
+      totalRounds: history.length,
+      finalLoss: history[history.length - 1]?.globalLoss ?? 0,
+      finalAccuracy: history[history.length - 1]?.globalAccuracy ?? 0,
+      avgSNR: history.reduce((a, b) => a + b.avgSNR, 0) / history.length,
+      avgFeederUptime: history.reduce((a, b) => a + b.feederLinkUptime, 0) / history.length,
+      totalHandovers: history[history.length - 1]?.handovers ?? 0,
+      elapsedMs: elapsed
+    }
+  };
+  if (args.json) {
+    console.log(JSON.stringify(output, null, 2));
+  } else if (args.csv) {
+    const headers = ["round", "loss", "accuracy", "avgSNR", "minSNR", "participation", "commBits", "avgElev", "avgDoppler", "feederUptime", "handovers", "satEnergy"];
+    const rows = history.map((m) => [
+      m.round,
+      m.globalLoss,
+      m.globalAccuracy,
+      m.avgSNR,
+      m.minSNR,
+      m.participationRate,
+      m.commCostBits,
+      m.avgElevation,
+      m.avgDoppler,
+      m.feederLinkUptime,
+      m.handovers,
+      m.satelliteEnergy
+    ]);
+    const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    console.log(csv);
+  } else if (args.output) {
+    (0, import_fs.writeFileSync)((0, import_path.resolve)(args.output), JSON.stringify(output, null, 2));
+    console.log(`Results written to ${args.output}`);
+  }
 }
-console.log("airan-ntn simulator initialized");
-//# sourceMappingURL=main.js.map
+main().catch((e) => {
+  console.error("Error:", e);
+  process.exit(1);
+});
+//# sourceMappingURL=cli.js.map
