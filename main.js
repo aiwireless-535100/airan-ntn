@@ -2976,6 +2976,38 @@ presetSel.addEventListener("change", () => {
     applyPreset(preset);
   }
 });
+var ORBIT_ALTITUDES = {
+  LEO: 550,
+  MEO: 2e4,
+  GEO: 35786
+};
+function updateAltitudeForOrbitType(orbitType) {
+  const altitudeInput = document.getElementById("cfg-altitude");
+  const altitudeVal = document.getElementById("cfg-altitude-val");
+  const key = orbitType;
+  const altitude = ORBIT_ALTITUDES[key] ?? 550;
+  if (altitudeInput && altitudeVal) {
+    altitudeInput.value = String(altitude);
+    altitudeInput.min = key === "GEO" ? "35786" : key === "MEO" ? "8000" : "300";
+    altitudeInput.max = key === "GEO" ? "35786" : key === "MEO" ? "25000" : "2000";
+    altitudeInput.disabled = key === "GEO";
+    altitudeInput.dispatchEvent(new Event("input"));
+  }
+}
+var orbitTypeSel = document.getElementById("cfg-orbittype");
+orbitTypeSel.addEventListener("change", (e) => {
+  updateAltitudeForOrbitType(e.target.value);
+});
+updateAltitudeForOrbitType(orbitTypeSel.value);
+var originalApplyPreset = applyPreset;
+applyPreset = function(preset) {
+  originalApplyPreset(preset);
+  const orbitTypeSel2 = document.getElementById("cfg-orbittype");
+  if (orbitTypeSel2) {
+    orbitTypeSel2.value = preset.orbitType;
+    updateAltitudeForOrbitType(preset.orbitType);
+  }
+};
 csvBtn.addEventListener("click", () => {
   if (!sim)
     return;
