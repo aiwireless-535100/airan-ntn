@@ -2940,6 +2940,10 @@ bindSlider("cfg-freq", "cfg-freq-val", (v) => v + "GHz");
 bindSlider("cfg-bw", "cfg-bw-val", (v) => v + "MHz");
 bindSlider("cfg-levyalpha", "cfg-levyalpha-val", (v) => v.toFixed(2));
 bindSlider("cfg-alpha", "cfg-alpha-val", (v) => v.toFixed(2));
-initSim();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initSim);
+} else {
+  initSim();
+}
 console.log("airan-ntn simulator initialized");
 //# sourceMappingURL=main.js.map
